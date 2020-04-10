@@ -1,0 +1,16 @@
+language: cpp
+compiler: mpiCC
+dist: trusty
+
+before_install:
+  - sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+  - sudo apt-get update -qq
+
+install: 
+  - sudo apt-get install -qq g++-6
+  - sudo apt-get install mpich
+  - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-6 90
+
+script: 
+  - mpiCC main.cpp -std=c++17 -o travis_mpi_cpp17
+  - ./travis_mpi_cpp17
