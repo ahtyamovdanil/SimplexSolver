@@ -1,0 +1,93 @@
+#define N 4
+
+#include <mpi.h>
+#include <iostream>
+#include <vector>
+#include <array>
+
+void print_results(std::string mess, std::array<std::array<int, N>, N> a){
+    std::cout << mess <<std::endl;
+    for(int i=0; i<N; ++i){
+        for(int j=0; j<N; j++){
+            std::cout << a[i][j] << ' ';
+        }
+        std::cout << std::endl;
+    }
+};
+
+template<class T, int n, int m>
+class Matrix{
+public:
+    T data[n][m];
+    Matrix() = default;
+    Matrix(std::initializer_list<std::initializer_list<T>> _il){
+        for(int i=0; i<m; ++i){
+            for(int j=0; j<m; ++j){
+                data[i][j] = *std::next(std::next(_il.begin(), i)->begin(), j);
+            }
+        }
+    }
+    Matrix& operator=(std::initializer_list<std::initializer_list<T>> _il){
+        //n = _il.size();
+        //m = _il.begin()->size();
+        //data = new T* [n];
+        for(int i=0; i<m; ++i){
+            //data[i] = new T[m];
+            for(int j=0; j<m; ++j){
+                data[i][j] = *std::next(std::next(_il.begin(), i)->begin(), j);
+            }
+        }
+    }
+    T* begin() {return &data[0][0];}
+};
+
+
+int main(int argc, char *argv[])
+{
+    int rank, size, tag = 99, sum = 0;
+    using Matrix = std::array<std::array<int, N>, N>;
+    Matrix a = {{{1,2,3,4},{5,6,7,8},{9,1,2,3},{4,5,6,7}}};
+    Matrix b = {{{1,2,3,4},{5,6,7,8},{9,1,2,3},{4,5,6,7}}};
+
+    //int c[N][N];
+    Matrix c;
+    std::array<int, N> aa{}, cc{};
+    //int aa[N],cc[N];
+
+
+    MPI_Init(&argc, &argv);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    std::cout << size << std::endl;
+
+    //scatter rows of first matrix to different processes
+    MPI_Scatter(a.data(), N*N/size, MPI_INT, aa.data(), N*N/size, MPI_INT, 0 , MPI_COMM_WORLD);
+
+    //broadcast second matrix to all processes
+    MPI_Bcast(b.data(), N*N, MPI_INT, 0, MPI_COMM_WORLD);
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    //perform vector multiplication by all processes
+    for (int i = 0; i < N; i++){
+        for (int j = 0; j < N; j++){
+            sum = sum + aa[j] * b[j][i];
+            //std::cout << i << ' ' << j << ' ' << aa[j] << ' ' << b[j][i] << std::endl;
+        }
+        std::cout << sum <<std::endl;
+        cc[i] = sum;
+        sum = 0;
+    }
+
+    MPI_Gather(cc.data(), N*N/size, MPI_INT, c.data(), N*N/size, MPI_INT, 0, MPI_COMM_WORLD);
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Finalize();
+    if (rank == 0){
+        std::cout << size << std::endl;
+        print_results("result", c);
+        std::cout << sizeof(c[0][0]) << std::endl;
+    }
+}
+
