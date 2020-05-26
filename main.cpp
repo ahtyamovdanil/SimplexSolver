@@ -1,14 +1,18 @@
-#define N 4
+#define N 6
+#define M 4
 
 #include <mpi.h>
 #include <iostream>
 #include <vector>
 #include <array>
+#include <cassert>
 
-void print_results(std::string mess, std::array<std::array<int, N>, N> a){
+
+//  mpiCC -o out main.cpp && mpiexec -np 8 /home/mirror/university/diploma/SimplexSolver/out
+void print_results(std::string mess, std::array<std::array<int, M>, N> a){
     std::cout << mess <<std::endl;
     for(int i=0; i<N; ++i){
-        for(int j=0; j<N; j++){
+        for(int j=0; j<M; j++){
             std::cout << a[i][j] << ' ';
         }
         std::cout << std::endl;
@@ -27,62 +31,55 @@ int main(int argc, char *argv[])
     MPI_Comm_rank(MPI_COMM_WORLD, &myid);
     MPI_Get_processor_name(processor_name, &namelen);
 
-    using Matrix = std::array<std::array<int, N>, N>;
-    Matrix a = {{{1,2,3,4},{5,6,7,8},{9,1,2,3},{4,5,6,7}}};
-    Matrix b = {{{1,2,3,4},{5,6,7,8},{9,1,2,3},{4,5,6,7}}};
-    Matrix c;
-    std::array<int, N> row_vec{}, cc{};
-    bool done = false;
-    int sum;
-    int vec_count = numprocs;
-    int n_batches = N / numprocs;
-    int curr_row=0;
-    //broadcast second matrix to all processes
-    MPI_Bcast(b.data(), N*N, MPI_INT, 0, MPI_COMM_WORLD);
+    //std::cout << "number of processors: " << numprocs << std::endl;
 
-    //scatter rows of first matrix to different processes
-    for(;curr_row < n_batches*vec_count; curr_row+=vec_count){
-        MPI_Scatter(&a[curr_row], N, MPI_INT, row_vec.data(), N, MPI_INT, 0 , MPI_COMM_WORLD);
-        MPI_Barrier(MPI_COMM_WORLD);
+    using Matrix = std::array<std::array<int, N>, M>;
+    using MatrixT = std::array<std::array<int, M>, N>;
 
-        //perform vector multiplication by all processes
-        for (int i = 0; i < N; i++){
-            for (int j = 0; j < N; j++){
-                sum = sum + row_vec[j] * b[j][i];
-            }
-            cc[i] = sum;
-            sum = 0;
+    int batch_rows = N / numprocs;
+    int  batch_size  =  batch_rows * M;
+    // constraint matrix
+    Matrix A = {{{6,4,1,0,0,0},
+                 {1,2,0,1,0,0},
+                 {-1,1,0,0,1,0},
+                 {0,1,0,0,0,1}}};
+
+    // transposed constraint matrix
+    MatrixT At = {{{6,1,-1,0},
+                   {4,2,1,1},
+                   {1,0,0,0},
+                   {0,1,0,0},
+                   {0,0,1,0},
+                   {0,0,0,1}}};
+
+    MatrixT At_test;
+    std::array<int, N> C = {-5,-4,0,0,0,0}; // z row
+    std::array<int, M> B = {24,6,1,2};      // F(x)
+
+    std::vector<std::array<int, M>> slave_columns(batch_rows);
+
+    //broadcast vector C to all processes
+    MPI_Bcast(C.data(), N, MPI_INT, 0, MPI_COMM_WORLD);
+    //broadcast vector B to all processes
+    MPI_Bcast(B.data(), M, MPI_INT, 0, MPI_COMM_WORLD);
+
+    //scatter rows of matrix At to different processes
+    //ToDo
+    assert(("Number of processors must be a multiple of the number of variables", N % numprocs == 0));
+
+    MPI_Scatter(At.data(), batch_size, MPI_INT, slave_columns.at(0).data(), batch_size, MPI_INT, 0 , MPI_COMM_WORLD);
+
+    for(auto &col: slave_columns){
+        for(auto &item: col) {
+            item = myid;
         }
-        MPI_Gather(cc.data(), N, MPI_INT, &c[curr_row], N, MPI_INT, 0, MPI_COMM_WORLD);
-        MPI_Barrier(MPI_COMM_WORLD);
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
-
-    if(N % numprocs != 0){
-        std::array<int, 1000> scounts = {0};
-        std::array<int, 1000> displs = {0};
-        for(int k=0; k < N % numprocs; ++k){
-            scounts[k] = N;
-            displs[k] = k*N;
-        }
-
-        //perform vector multiplication by all processes
-        if(scounts[myid]!=0){
-            MPI_Scatterv(&a[curr_row], scounts.data(), displs.data(), MPI_INT, row_vec.data(), N, MPI_INT, 0 , MPI_COMM_WORLD);
-            for (int i = 0; i < N; i++){
-                for (int j = 0; j < N; j++){
-                    sum = sum + row_vec[j] * b[j][i];
-                }
-                cc[i] = sum;
-                sum = 0;
-            }
-        }
-        MPI_Gatherv(cc.data(), N, MPI_INT, &c[curr_row], scounts.data(), displs.data() ,MPI_INT, 0, MPI_COMM_WORLD);
-    }
+    MPI_Gather(slave_columns.at(0).data(), batch_size, MPI_INT, At_test.data(), batch_size, MPI_INT, 0, MPI_COMM_WORLD);
 
     if(myid==0)
-        print_results("results", c);
+        print_results("results", At_test);
 
     // Освобождение подсистемы MPI
     MPI_Finalize();

@@ -1,8 +1,0 @@
-//
-// Created by mirror on 28.04.2020.
-//
-
-#ifndef SIMPLEXSOLVER_SOVER_HPP
-#define SIMPLEXSOLVER_SOVER_HPP
-
-#endif //SIMPLEXSOLVER_SOVER_HPP
