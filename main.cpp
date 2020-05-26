@@ -1,37 +1,20 @@
-//#define N 6
-//#define M 4
-
 #include <mpi.h>
 #include <iostream>
 #include <vector>
 #include <array>
 #include <cassert>
 #include <cmath>
+#include "solver.hpp"
 
 
 //  mpiCC -o out main.cpp && mpiexec -np 8 /home/mirror/university/diploma/SimplexSolver/out
-template<int N, int M>
-void print_results(std::string mess, std::array<std::array<int, M>, N> a){
-    std::cout << mess <<std::endl;
-    for(int i=0; i<N; ++i){
-        for(int j=0; j<M; j++){
-            std::cout << a[i][j] << ' ';
-        }
-        std::cout << std::endl;
-    }
-};
 
 int main(int argc, char *argv[])
 {
     int numprocs, myid, namelen;
     char processor_name[MPI_MAX_PROCESSOR_NAME];
-    // Инициализация подсистемы MPI
-    MPI_Init(&argc, &argv);
-    // Получить общее число процессов numprocs в рамках задачи)
-    MPI_Comm_size(MPI_COMM_WORLD, &numprocs);
-    // Получить номер myid текущего процесса
-    MPI_Comm_rank(MPI_COMM_WORLD, &myid);
-    MPI_Get_processor_name(processor_name, &namelen);
+
+    simplex::init_solver(&argc, &argv, &numprocs, &myid, &namelen, processor_name);
 
     //std::cout << "number of processors: " << numprocs << std::endl;
     constexpr int N = 5;
@@ -39,31 +22,14 @@ int main(int argc, char *argv[])
 
     using Matrix = std::array<std::array<int, N>, M>;
     using MatrixT = std::array<std::array<int, M>, N>;
-    //using MatrixT = std::array<std::array<int, M>, N>;
-
-    /*
-    int batch_rows = N / numprocs;
-    int batch_size  =  batch_rows * M;
-    int last_slave_col = N % numprocs;
-    */
 
     // number of rows in one batch
     int batch_rows = std::ceil(float(N) / numprocs);
     // batch size
     int batch_size = batch_rows * M;
-    // number of elements in each batch
-    //std::vector<int> scounts(numprocs, batch_rows * M);
-    // last batch may be smaller than other ones
-    int rows_in_last = (N % batch_rows == 0) ? batch_rows : N % batch_rows;
-    //const_cast<const* std::vector<int>>(scounts);
 
-    // offset for each batch
-    /*
-    std::vector<int> displs(numprocs);
-    for(int i=0; i<displs.size(); i++)
-        displs.at(i) = i*batch_rows*M;
-    */
-    //
+    // last batch may be smaller than the other ones
+    int rows_in_last = (N % batch_rows == 0) ? batch_rows : N % batch_rows;
 
     // constraint matrix
     /*
@@ -94,13 +60,10 @@ int main(int argc, char *argv[])
     //scatter rows of matrix At to different processes
     assert(("Number of processors must be less or equal to the number of variables", N >= numprocs));
 
-    MPI_Barrier(MPI_COMM_WORLD);
     MPI_Scatter(At.data(), batch_size, MPI_INT, slave_columns.at(0).data(), batch_size, MPI_INT, 0 , MPI_COMM_WORLD);
-    //MPI_Scatterv(At.data(), scounts.data(), displs.data(), MPI_INT, slave_columns.at(0).data(), 1, MPI_INT, 0 , MPI_COMM_WORLD);
 
-
+    // last process may have smaller batch then other ones
     if(myid == numprocs - 1){
-
         slave_columns.resize(rows_in_last);
     }
 
@@ -111,18 +74,13 @@ int main(int argc, char *argv[])
         }
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
     MPI_Gather(slave_columns.at(0).data(), batch_size, MPI_INT, At_test.data(), batch_size, MPI_INT, 0, MPI_COMM_WORLD);
-    //MPI_Gatherv(slave_columns.at(0).data(), 1, MPI_INT, At_test.data(), scounts.data(), displs.data() ,MPI_INT, 0, MPI_COMM_WORLD);
 
-    if(myid==0)
-        print_results<N, M>("results", At_test);
+    if(myid==0){
+        simplex::print_matrix<N, M>("results", At_test);
+        std::cout << "ok" << std::endl;
+    }
 
     // Освобождение подсистемы MPI
     MPI_Finalize();
 }
-/*array([[ 54,  37,  47,  57],
-       [130,  93, 119, 145],
-       [ 44,  41,  56,  71],
-       [111,  79, 101, 123]])
-*/
