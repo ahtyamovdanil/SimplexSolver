@@ -13,12 +13,12 @@
 
 namespace simplex {
 
-    template<int N, int M>
-    void print_matrix(std::string mess, std::array<std::array<int, M>, N> &a) {
+    template<class T>
+    void print_matrix(std::string mess, T &a) {
         std::cout << mess << std::endl;
-        for (int i = 0; i < N; ++i) {
-            for (int j = 0; j < M; j++) {
-                std::cout << a[i][j] << ' ';
+        for (auto & row: a) {
+            for (auto & item: row) {
+                std::cout << item << " ";
             }
             std::cout << std::endl;
         }
@@ -35,15 +35,23 @@ namespace simplex {
         MPI_Get_processor_name(processor_name, namelen);
     }
 
-    template<class Mtrx>
-    void column_apply(Mtrx m, void (*func)());
-
-    // return pointer to min element
-    template<class Vec>
-    inline int loc_pivot(Vec& c){
-        auto min_it = std::min_element(c.begin(), c.end());
-        return min_it;
-        //return std::pair<decltype(*min_it),int> (*min_it, myid);
+    template<class T>
+    int find_piv_row(T &arr1, T &arr2) {
+        if (arr1.size() != arr2.size())
+            throw std::range_error("size of arrays must be same");
+        int idx, result, val = -1;
+        for (int i = 0; i < arr1.size(); i++) {
+            if (arr2[i] != 0) {
+                val = arr1[i] / arr2[i];
+                if (val > 0 && (val < result || result == -1)) {
+                    std::cout << "res: " << val << std::endl;
+                    result = val;
+                    idx = i;
+                }
+            }
+        }
+        std::cout << "result " << result << std::endl;
+        return idx;
     }
 
 }

@@ -6,18 +6,15 @@
 #include <cmath>
 #include "solver.hpp"
 
-
 //  mpiCC -o out main.cpp && mpiexec -np 8 /home/mirror/university/diploma/SimplexSolver/out
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     int numprocs, myid, namelen;
     char processor_name[MPI_MAX_PROCESSOR_NAME];
 
     simplex::init_solver(&argc, &argv, &numprocs, &myid, &namelen, processor_name);
 
-    //std::cout << "number of processors: " << numprocs << std::endl;
-    constexpr int N = 5;
+    constexpr int N = 6;
     constexpr int M = 4;
 
     using Matrix = std::array<std::array<float, N>, M>;
@@ -39,76 +36,176 @@ int main(int argc, char *argv[])
                  {0,1,0,0,0,1}}};
 */
     // transposed constraint matrix
-    const MatrixT At = {{{6,1,-1,0},
-                       {4,2,1,1},
-                       {1,0,0,0},
-                       {0,1,0,0},
-                      // {0,0,1,0},
-                       {0,0,0,1}}};
+    MatrixT At = {{{6, 1, -1, 0},
+                   {4, 2, 1, 1},
+                   {1, 0, 0, 0},
+                   {0, 1, 0, 0},
+                   {0, 0, 1, 0},
+                   {0, 0, 0, 1}}};
 
     MatrixT At_test;
-    std::array<float, N> C = {-1,-1,1,-5,2}; // z row
-    std::array<float, M> B = {24,6,1,2};      // F(x)
+    std::array<float, N> C = {-5, -4, 0, 0, 0, 0}; // z row
+    std::array<float, M> B = {24, 6, 1, 2};    // F(x)
+    float optimum = 0;
+    int pivot_row_idx;
+    std::array<float, M> pivot_column = {};
 
     // Matrix with bunch of columns for each processor
     std::vector<std::array<float, M>> slave_columns(batch_rows);
+
+    // last process may have smaller batch then other ones
+    if (myid == 0) {
+        slave_columns.resize(rows_in_last);
+    }
+
     // Vector with local pivots from all processors
-    std::vector<float> local_pivots(numprocs);
+    std::vector<float> local_piv_values(numprocs);
+    std::vector<int> local_piv_idxs(numprocs);
+
     // Vector with local z row
     std::vector<float> local_c(batch_rows);
+    if (myid == 0) {
+        local_c.resize(rows_in_last);
+    }
 
+    // indicator that optimum has been found
+    bool is_done = false;
 
-    //broadcast vector [C] to all processors
-    MPI_Bcast(C.data(), N, MPI_FLOAT, 0, MPI_COMM_WORLD);
     //broadcast vector [B] to all processors
     MPI_Bcast(B.data(), M, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
     assert(("Number of processors must be less or equal to the number of variables", N >= numprocs));
     //scatter rows of matrix [At] to each processor
-    MPI_Scatter(At.data(), batch_size, MPI_FLOAT, slave_columns.at(0).data(), batch_size, MPI_FLOAT, 0 , MPI_COMM_WORLD);
-
-    // last process may have smaller batch then other ones
-    if(myid == numprocs - 1){
-        slave_columns.resize(rows_in_last);
-    }
+    MPI_Scatter(At.data(), batch_size, MPI_FLOAT, slave_columns.at(0).data(), batch_size, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
     //scatter elements of z-row [C] to each processor
     MPI_Scatter(C.data(), batch_rows, MPI_FLOAT, local_c.data(), batch_rows, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
-    if(myid == numprocs - 1){
-        local_c.resize(rows_in_last);
-    }
+    std::vector<float>::iterator loc_piv_iter;
+    int loc_piv_i;
+    float loc_piv_val;
 
-    // find pivot column in each processor
-    float local_piv = *std::min_element(local_c.begin(), local_c.end());
+    std::vector<float>::iterator zvalue_iter;
+    int pivot_column_proc_id;
+    float global_zvalue;
+    int global_zidx;
 
-    // gather all local pivots from all processors
-    MPI_Gather(&local_piv, 1, MPI_FLOAT, local_pivots.data(), 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
+        while(!is_done){
+        // find pivot column value and index in each processor
+        loc_piv_iter = std::min_element(local_c.begin(), local_c.end());
+        loc_piv_i = std::distance(local_c.begin(), loc_piv_iter);
+        loc_piv_val = *loc_piv_iter;
+        pivot_column = slave_columns.at(loc_piv_i);
 
-    // get value of global pivot and its processor id
-    auto pivot_iter = std::min_element(local_pivots.begin(), local_pivots.end());
-    int pivot_id = std::distance(local_pivots.begin(), pivot_iter);
-    float global_pivot = *pivot_iter;
-    /*
-    for(auto &col: slave_columns){
-        for(auto &item: col) {
-            item = myid;
-            //std::cout << myid << ' ' << item << std::endl;
+        // gather all local pivots values and indexes from all processors
+        MPI_Gather(&loc_piv_val, 1, MPI_FLOAT, local_piv_values.data(), 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
+        MPI_Gather(&loc_piv_i, 1, MPI_FLOAT, local_piv_idxs.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+        // get value of global pivot column and its processor id
+        if (myid == 0) {
+            zvalue_iter = std::min_element(local_piv_values.begin(), local_piv_values.end());
+            pivot_column_proc_id = std::distance(local_piv_values.begin(), zvalue_iter);
+            global_zvalue = *zvalue_iter;
+            global_zidx = local_piv_idxs[pivot_column_proc_id];
         }
+
+        // broadcast processor id to all processors
+        MPI_Bcast(&pivot_column_proc_id, 1, MPI_INT, 0, MPI_COMM_WORLD);
+        MPI_Barrier(MPI_COMM_WORLD);
+
+        // broadcast pivot column to all processors
+        MPI_Bcast(pivot_column.data(), M, MPI_FLOAT, pivot_column_proc_id, MPI_COMM_WORLD);
+
+        // broadcast pivot value in the z-row
+        MPI_Bcast(&global_zvalue, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+        if (global_zvalue >= 0) {
+            is_done = true;
+        }
+
+        //find index of the pivot row
+        if (myid == 0) {
+            pivot_row_idx = simplex::find_piv_row(B, pivot_column);
+        }
+
+        MPI_Bcast(&pivot_row_idx, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+        // pivot value - element on the cross of the pivot row and pivot column
+        float pivot_elem = pivot_column[pivot_row_idx];
+
+        // update pivot row in each processor
+        for (auto &col : slave_columns) {
+            col[pivot_row_idx] /= pivot_elem;
+        }
+
+        // update [B] in pivot row
+        B[pivot_row_idx] /= pivot_elem;
+
+        // update global optimum value
+        if (myid == 0) {
+            std::cout << "kek0 " << global_zvalue << ' ' << B[pivot_row_idx] << std::endl;
+            optimum -= global_zvalue * B[pivot_row_idx];
+        }
+
+        // update z-row
+        for (int j = 0; j < local_c.size(); ++j) {
+            local_c[j] -= global_zvalue * slave_columns[j][pivot_row_idx];
+        }
+
+        //update values in the rest of the table
+        for (auto &col : slave_columns) {
+            for (int j = 0; j < M; ++j) {
+                if (j != pivot_row_idx) {
+                    col[j] -= pivot_column[j] * col[pivot_row_idx];
+                }
+            }
+        }
+
+        // update results vector [B]
+        for (int j = 0; j < M; ++j) {
+            if (j != pivot_row_idx) {
+                B[j] -= pivot_column[j] * B[pivot_row_idx];
+            }
+        }
+
+        MPI_Barrier(MPI_COMM_WORLD);
     }
-*/
-    //MPI_Gather(slave_columns.at(0).data(), batch_size, MPI_INT, At_test.data(), batch_size, MPI_INT, 0, MPI_COMM_WORLD);
+    // gather vector C from all processors
+    MPI_Gather(local_c.data(), batch_rows, MPI_FLOAT, C.data(), batch_rows, MPI_FLOAT, 0, MPI_COMM_WORLD);
+
+    // gather all columns
+    MPI_Gather(slave_columns[0].data(), batch_size, MPI_FLOAT, At[0].data(), batch_size, MPI_INT, 0, MPI_COMM_WORLD);
 
     if(myid==0){
         //simplex::print_matrix<N, M>("results", At_test);
-        std::cout << "local pivots:" << std::endl;
-        for(auto &item: local_pivots)
+        std::cout << "local pivots values:" << std::endl;
+        for(auto &item: local_piv_values)
+            std::cout << item << ' ';
+
+        std::cout << "\nlocal pivots indexes:" << std::endl;
+        for(auto &item: local_piv_idxs)
+            std::cout << item << ' ';
+
+        std::cout << "\npivot column:" << std::endl;
+        for(auto &item: pivot_column)
             std::cout << item << ' ';
 
         //std::cout << std::endl << "global pivot:" << std::endl;
-        std::cout << "\nglobal pivot value: " << global_pivot << std::endl
-                  << "global pivot processor id: " << pivot_id << std::endl;
-        std::cout << "\n ok" << std::endl;
+        std::cout << "\nglobal pivot value: " << global_zvalue << std::endl
+                  << "global pivot processor id: " << pivot_column_proc_id << std::endl
+                  << "global pivot column index: : " << global_zidx << std::endl
+                  << "pivot row index: : " << pivot_row_idx << std::endl;
+
+        std::cout << "----------------------" <<std::endl;
+        std::cout << "\nB:" << std::endl;
+        for(auto &item: B)
+            std::cout << item << ' ';
+        std::cout << "\nC:" << std::endl;
+        for(auto &item: C)
+            std::cout << item << ' ';
+        simplex::print_matrix("\nresult matrix: ", At);
+        std::cout << "optimum value: " << optimum << std::endl;
+        std::cout << "ok" << std::endl;
     }
 
     // Освобождение подсистемы MPI
