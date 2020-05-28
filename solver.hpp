@@ -1,5 +1,6 @@
 //
-// Created by mirror on 28.04.2020.
+// Created by Ahtyamov Danil on 28.04.2020.
+// https://github.com/ahtyamovdanil
 //
 #ifndef SIMPLEXSOLVER_SOLVER_HPP
 #define SIMPLEXSOLVER_SOLVER_HPP

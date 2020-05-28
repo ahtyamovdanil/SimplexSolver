@@ -1,3 +1,8 @@
+//
+// Created by Ahtyamov Danil on 28.04.2020.
+// https://github.com/ahtyamovdanil
+//
+
 #include <mpi.h>
 #include <iostream>
 #include <vector>
