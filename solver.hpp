@@ -12,21 +12,38 @@
 #include <iostream>
 #include <algorithm>
 
-namespace simplex {
+namespace solver {
 
     template <class T>
     class matrix {
-        int columns_;
-        int rows_;
         std::vector<T> data_;
+        int rows_;
+        int columns_;
     public:
-        matrix(int rows, int columns, std::vector<T> data) : columns_(columns), rows_(rows), data_(data) {}
+        matrix(int rows, int columns) :rows_(rows), columns_(columns) {
+            data_.reserve(rows*columns);
+        }
+        matrix(int rows, int columns, std::vector<T> data) : rows_(rows), columns_(columns), data_(data) {}
 
         T &operator()(int row, int column) { return data_[row*columns_+column]; }
+        T &operator()(int index) { return data_[index]; }
 
         int rows(){return rows_;}
         int columns(){return columns_;}
-        int data(){ return data_.data();}
+        T* data(){ return data_.data();}
+
+        void resize(int rows){
+            rows_ = rows;
+        };
+
+        T& at(int row, int column){
+            return data_[row*columns_+column];
+        }
+        std::vector<T> at(int row){
+            return std::vector<T>(data_.begin() + row*columns_, data_.begin() + (row+1)*columns_);
+        }
+
+        //~matrix(){ std::cout<<"destructor\n"; data_.~vector(); }
     };
 
     template<typename T>
