@@ -1,0 +1,1 @@
+/usr/bin/mpiCC  -g   CMakeFiles/SimplexSolver.dir/main.cpp.o  -o SimplexSolver 

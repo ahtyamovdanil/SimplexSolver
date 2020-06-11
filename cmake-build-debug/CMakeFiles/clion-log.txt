@@ -1,0 +1,4 @@
+/home/mirror/soft/clion-2020.1/bin/cmake/linux/bin/cmake -DCMAKE_BUILD_TYPE=Debug -D CMAKE_CXX_COMPILER=/usr/bin/mpiCC -G "CodeBlocks - Unix Makefiles" /home/mirror/university/diploma/SimplexSolver
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/mirror/university/diploma/SimplexSolver/cmake-build-debug

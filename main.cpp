@@ -11,7 +11,7 @@
 #include <cmath>
 #include <numeric>
 #include "solver.hpp"
-
+#include <fstream>
 
 //#define N 6
 //#define M 4
@@ -20,6 +20,26 @@
 // mpiCC -o out main.cpp && mpiexec -np 4 /home/mirror/university/diploma/SimplexSolver/out 1000 100
 int main(int argc, char *argv[]) {
 
+    int N = std::stoi(argv[1]);
+    int M = std::stoi(argv[2]);
+    std::cout << N << ' ' << M;
+    std::string filename;
+    bool basis = false;
+    switch ( argc ){
+        case 4:
+            filename = argv[3];
+            std::cout << filename << ' ' << M;
+            break;
+        case 5:
+            filename = argv[3];
+            std::cout << filename << ' ' << "kerek";
+            basis = true;
+        case 3:
+            break;
+        default:
+            N = 6;
+            M = 4;
+    }
     int numprocs, myid, namelen;
     bool output = false;
 
@@ -27,8 +47,8 @@ int main(int argc, char *argv[]) {
 
     solver::init_solver(&argc, &argv, &numprocs, &myid, &namelen, processor_name);
 
-    int M = std::stoi(argv[2]);
-    int N = std::stoi(argv[1]) + M;
+     //   int M = std::stoi(argv[2]);
+ //   int N = std::stoi(argv[1]) + M;
 
     //int const N = 2 + 4*2;
     //int M = 100;
@@ -50,7 +70,7 @@ int main(int argc, char *argv[]) {
     std::vector<float> B = {2, 1, 6, 1, 2};    // F {24, 6, 1, 2}
 
 */
-
+/*
     solver::matrix<float> At(N, M, {6, 1, -1, 0,
                                     4, 2, 1, 1,
                                     1, 0, 0, 0,
@@ -60,7 +80,7 @@ int main(int argc, char *argv[]) {
 
     std::vector<float> C = {-5, -4, 0, 0, 0, 0};
     std::vector<float> B = {24, 6, 1, 2};
-
+*/
 /*
     solver::matrix<float> At(N, M, {1, 1, 1, -1, 0, 0,
                                     1, -1, 2, 1, 1, 1,
@@ -85,9 +105,18 @@ int main(int argc, char *argv[]) {
     std::vector<float> C2(N);
     std::vector<float> B2(M);
 
+    //bool basis = true;
+    //std::string filename = "/home/mirror/university/diploma/SimplexSolver/user_data_basis.csv";
+    if(myid == 0){
+        At2 = solver::matrix<float>(N, M);
+        std::tie(At2, B2, C2) = solver::read_csv(filename, 6, 4, basis);
+    }
+    solver::find_BFS(numprocs, myid, At2, B2);
+    return 0;
+    /*
     if(myid == 0)
         std::tie(At2, B2, C2) = solver::random_problem<float>(N,M);
-
+    */
     float optimum = 0;
     //solver::find_BFS(numprocs, myid, At2, B2);
     const clock_t begin_time = clock();

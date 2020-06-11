@@ -13,6 +13,8 @@
 #include <algorithm>
 #include <tuple>
 #include <ctime>
+#include <sstream>
+#include <fstream>
 
 namespace solver {
 
@@ -22,7 +24,7 @@ namespace solver {
         int rows_;
         int columns_;
     public:
-        matrix(int rows, int columns) :rows_(rows), columns_(columns) {
+        matrix(int rows, int columns) :rows_(0), columns_(columns) {
             data_.reserve(rows*columns);
         }
         matrix(int rows, int columns, std::vector<T> data) : rows_(rows), columns_(columns), data_(data) {}
@@ -52,7 +54,7 @@ namespace solver {
             return std::vector<T>(data_.begin() + row*columns_, data_.begin() + (row+1)*columns_);
         }
 
-        void add_row(std::vector<T>& row){
+        void add_row(std::vector<float> row){
             if(row.size() != columns_)
                 throw std::length_error("row length not equal to the number of matrix columns");
             data_.insert(data_.end(), row.begin(), row.end());
@@ -61,6 +63,7 @@ namespace solver {
 
         //~matrix(){ std::cout<<"destructor\n"; data_.~vector(); }
     };
+
 
 
     template<typename T>
@@ -106,10 +109,44 @@ namespace solver {
         return idx;
     }
 
+   std::vector<float> split_string(std::string &str){
+        std::vector<float> resline;
+        std::string delimiter = ";";
+        size_t pos = 0;
+        std::string token;
+        while ((pos = str.find(delimiter)) != std::string::npos) {
+            token = str.substr(0, pos);
+            resline.push_back(std::stof(token));
+            str.erase(0, pos + delimiter.length());
+        }
+        return resline;
+    }
 
-    template<typename T>
-    inline std::tuple<matrix<T>, std::vector<T>, std::vector<T>>  read_csv(std::string filename){
-        // todo
+    inline std::tuple<matrix<float>, std::vector<float>, std::vector<float>>  read_csv(std::string filename, int N, int M, bool basis){
+        std::ifstream infile;
+        matrix<float> A(N,M);
+        std::vector<float> B;
+        std::vector<float> C;
+        infile.open(filename, std::ios::in);
+
+                //std::vector<std::string> kek = solver::getNextLineAndSplitIntoTokens(infile);
+        if(infile.is_open()){
+            std::string line;
+            std::getline(infile, line);
+            B = split_string(line);
+            if(basis) {
+                std::getline(infile, line);
+                C = split_string(line);
+            }
+            while (std::getline(infile, line)){
+                auto res = split_string(line);
+                if(res.size() == 0)
+                    break;
+                A.add_row(res);
+            }
+            infile.close();
+        }
+        return std::make_tuple(std::move(A),std::move(B),std::move(C));
     }
 
 
@@ -417,6 +454,20 @@ namespace solver {
             }
             std::cout << "\ndone" << std::endl;
         }
+        if(myid == 0){
+            for(int i = 0; i<N-M; ++i){
+                if((std::find(bind.begin(), bind.end(), i)) == bind.end())
+                    std::cout << 0 << ';';
+                else
+                    for(int j = 0; j<bind.size(); ++j){
+                        if(bind[j] == i){
+                            std::cout << B[j] << ';';
+                            B.erase(B.begin()+i);
+                        }
+                    }
+
+            }
+        }
     }
 
     inline void find_BFS(int& numprocs, int& myid, matrix<float>& At, std::vector<float>& B) {
@@ -447,6 +498,28 @@ namespace solver {
 
         solve(numprocs, myid, At, C, B, optimum, false);
     }
-}
 
+
+    std::vector<std::string> getNextLineAndSplitIntoTokens(std::istream& str)
+    {
+        std::vector<std::string>   result;
+        std::string                line;
+        std::getline(str,line);
+
+        std::stringstream lineStream(line);
+        std::string cell;
+
+        while(std::getline(lineStream,cell, ','))
+        {
+            result.push_back(cell);
+        }
+        // This checks for a trailing comma with no data after it.
+        if (!lineStream && cell.empty())
+        {
+            // If there was a trailing comma then add an empty element.
+            result.push_back("");
+        }
+        return result;
+    }
+}
 #endif //SIMPLEXSOLVER_SOLVER_HPP

@@ -1,0 +1,64 @@
+#!/bin/bash
+
+#f
+r=0
+N=0
+M=0
+b=0
+echo $p
+while [ -n "$1" ]
+do
+case "$1" in
+-r) echo "Found the -r option"
+r=1;;
+-f) param="$2"
+echo "Found the -f option, with parameter value $param"
+f=$param
+shift ;;
+-N) param="$2"
+echo "Found the -N option, with parameter value $param"
+N=$param
+shift ;;
+-M) param="$2"
+echo "Found the -M option, with parameter value $param"
+M=$param
+shift ;;
+-b) echo "Found the -b option"
+b=1 ;;
+--) shift
+break ;;
+
+*) echo "$1 is not an option";;
+esac
+shift
+done
+count=1
+for param in "$@"
+do
+echo "Parameter #$count: $param"
+count=$(( $count + 1 ))
+done
+
+
+if [ $f ] 
+then 
+  if [ $b -eq 1 ]
+    then
+  	echo $f $N $M $b
+  	 mpiexec -np 8 /home/mirror/university/diploma/SimplexSolver/out $f $N $M $b
+  	exit 0;
+    else
+        mpiexec -np 8 /home/mirror/university/diploma/SimplexSolver/out $f $N $M
+        exit 0;
+  fi
+else
+  if [ $r -eq 1 ]
+  then 
+    echo $r random $N $M
+    mpiexec -np 8 /home/mirror/university/diploma/SimplexSolver/out $N $M
+  fi
+fi
+
+
+
+
