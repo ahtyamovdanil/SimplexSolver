@@ -94,12 +94,17 @@ int main(int argc, char *argv[]) {
 
     solver::solve(numprocs, myid, At2, C2, B2, optimum, output);
 
+    /*
     if(myid == 0){
-        std::cout << "time: " << float( clock () - begin_time ) /  CLOCKS_PER_SEC << std::endl;
+        std::cout << "time: " << float( clock () - begin_time ) /  CLOCKS_PER_SEC;
         std::cout << "parameters: " << N << '/' << M << " with pocs number: " << numprocs << std::endl;
         std::cout << N << ' ' << M << std::endl;
     }
-
+*/
+    if(myid == 0){
+        std::cout.precision(3);
+        std::cout << N << ';' << M << ';' << numprocs << ';' << float( clock () - begin_time ) /  CLOCKS_PER_SEC;
+    }
     MPI_Finalize();
 
     return 0; //todo

@@ -115,7 +115,7 @@ namespace solver {
 
     template<typename T>
     inline std::tuple<matrix<T>, std::vector<T>, std::vector<T>> random_problem(int N, int M) {
-        srand(time(NULL));
+        //srand(time(NULL));
         matrix<T> At(N, M);
         std::vector<T> B(M);
         std::vector<T> C(N);
@@ -196,11 +196,11 @@ namespace solver {
             M = At.columns();
         }
 
-        std::cout << N <<std::endl;
+        //std::cout << N <<std::endl;
         MPI_Bcast(&N, 1, MPI_INT, 0, MPI_COMM_WORLD);
         MPI_Bcast(&M, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-        std::cout << "kek " << N <<std::endl;
+        //std::cout << "kek " << N <<std::endl;
 
         std::vector<int> bind(M);
         for(int i=0; i<bind.size(); ++i){
