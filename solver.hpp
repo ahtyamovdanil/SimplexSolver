@@ -26,6 +26,7 @@ namespace solver {
             data_.reserve(rows*columns);
         }
         matrix(int rows, int columns, std::vector<T> data) : rows_(rows), columns_(columns), data_(data) {}
+        matrix() : rows_(0), columns_(0) {}
 
         T &operator()(int row, int column) { return data_[row*columns_+column]; }
         T &operator()(int index) { return data_[index]; }
@@ -187,8 +188,19 @@ namespace solver {
                       float& optimum,
                       bool output){
 
-        int N = At.rows();
-        int M = At.columns();
+        int N;
+        int M;
+
+        if(myid == 0){
+            N = At.rows();
+            M = At.columns();
+        }
+
+        std::cout << N <<std::endl;
+        MPI_Bcast(&N, 1, MPI_INT, 0, MPI_COMM_WORLD);
+        MPI_Bcast(&M, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+        std::cout << "kek " << N <<std::endl;
 
         std::vector<int> bind(M);
         for(int i=0; i<bind.size(); ++i){

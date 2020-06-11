@@ -78,11 +78,15 @@ int main(int argc, char *argv[]) {
     std::vector<float> Cm(N);
 */
 
-    solver::matrix<float> At2(N,M);
+    //solver::matrix<float> At2(N,M);
+    //std::vector<float> C2(N);
+    //std::vector<float> B2(M);
+    solver::matrix<float> At2;
     std::vector<float> C2(N);
     std::vector<float> B2(M);
 
-    std::tie(At2, B2, C2) = solver::random_problem<float>(N,M);
+    if(myid == 0)
+        std::tie(At2, B2, C2) = solver::random_problem<float>(N,M);
 
     float optimum = 0;
     //solver::find_BFS(numprocs, myid, At2, B2);
