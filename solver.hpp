@@ -53,13 +53,14 @@ namespace solver {
 
         void add_row(std::vector<T>& row){
             if(row.size() != columns_)
-                throw std::out_of_range("row length not equal to the number of matrix columns");
+                throw std::length_error("row length not equal to the number of matrix columns");
             data_.insert(data_.end(), row.begin(), row.end());
             ++ rows_;
         }
 
         //~matrix(){ std::cout<<"destructor\n"; data_.~vector(); }
     };
+
 
     template<typename T>
     void print_matrix(std::string mess, T &a) {
@@ -72,6 +73,7 @@ namespace solver {
         }
     };
 
+
     // initialization of MPI system
     inline void init_solver(int *argc, char **argv[], int *numprocs, int *myid, int *namelen, char *processor_name) {
         MPI_Init(argc, argv);
@@ -82,6 +84,7 @@ namespace solver {
         // Get name of the processor
         MPI_Get_processor_name(processor_name, namelen);
     }
+
 
     template<typename T>
     int find_piv_row(T &B, T &piv_col) {
@@ -102,9 +105,12 @@ namespace solver {
         return idx;
     }
 
-    inline void read_csv(std::string filename){
+
+    template<typename T>
+    inline std::tuple<matrix<T>, std::vector<T>, std::vector<T>>  read_csv(std::string filename){
         // todo
     }
+
 
     template<typename T>
     inline std::tuple<matrix<T>, std::vector<T>, std::vector<T>> random_problem(int N, int M) {
@@ -173,7 +179,13 @@ namespace solver {
         return std::make_tuple(std::move(At),std::move(B),std::move(C));
     }
 
-    inline void solve(int& numprocs, int& myid, matrix<float>& At, std::vector<float>& C , std::vector<float>& B, float& optimum){
+
+    inline void solve(int& numprocs,
+                      int& myid, matrix<float>& At,
+                      std::vector<float>& C ,
+                      std::vector<float>& B,
+                      float& optimum,
+                      bool output){
 
         int N = At.rows();
         int M = At.columns();
@@ -280,22 +292,25 @@ namespace solver {
             if (myid == 0) {
                 // output for debuging
                 //std::cout << "\n+-------------------------------+" << std::endl;
-                std::cout << "|  current optimum: " << optimum << "\t\t|" << std::endl;
+                //std::cout << "|  current optimum: " << optimum << "\t\t|" << std::endl;
+                if(output) {
+                    std::cout << "|  current optimum: " << optimum << "\t\t|" << std::endl;
 
-                std::cout << "|  current B: ";
-                for(int i=0; i<B.size(); ++i)
-                    std::cout << B.at(i) << '[' << bind[i] << ']' << ' ';
+                    std::cout << "|  current B: ";
+                    for (int i = 0; i < B.size(); ++i)
+                        std::cout << B.at(i) << '[' << bind[i] << ']' << ' ';
 
-                std::cout << "\t\t|\n+-------------------------------+" << std::endl;
-
+                    std::cout << "\t\t|\n+-------------------------------+" << std::endl;
+                }
                 zvalue_iter = std::min_element(local_piv_values.begin(), local_piv_values.end());
                 pivot_column_proc_id = std::distance(local_piv_values.begin(), zvalue_iter);
                 global_zvalue = *zvalue_iter;
                 global_zidx = local_piv_idxs[pivot_column_proc_id];
-                std::cout << "|  current global_zvalue: " << global_zvalue << "\t\t|" << std::endl;
-                std::cout << "|  current global_zidx: " << global_zidx << "\t\t|" << std::endl;
+                if(output){
+                    std::cout << "|  current global_zvalue: " << global_zvalue << "\t\t|" << std::endl;
+                    std::cout << "|  current global_zidx: " << global_zidx << "\t\t|" << std::endl;
+                }
                 ++it;
-
             }
 
             // broadcast processor id to all processors
@@ -318,7 +333,8 @@ namespace solver {
                 if(pivot_row_idx == -1)
                     break;
                 int it = std::accumulate(c_sizes.begin(), c_sizes.begin()+pivot_column_proc_id, 0);
-                std::cout << "|  current pivot_row_idx: " << pivot_row_idx << "\t\t|" << std::endl;
+                if(output)
+                    std::cout << "|  current pivot_row_idx: " << pivot_row_idx << "\t\t|" << std::endl;
                 bind[pivot_row_idx] = it + global_zidx;
             }
 
@@ -372,7 +388,7 @@ namespace solver {
         MPI_Barrier(MPI_COMM_WORLD);
 
         // print finale result
-        if(myid==0){
+        if(myid==0 && output){
             std::cout << "----------------------" <<std::endl;
             std::cout << "\nB:" << std::endl;
 
@@ -417,7 +433,7 @@ namespace solver {
             }
         }
 
-        solve(numprocs, myid, At, C, B, optimum);
+        solve(numprocs, myid, At, C, B, optimum, false);
     }
 }
 
