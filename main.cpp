@@ -11,30 +11,22 @@
 #include <cmath>
 #include <numeric>
 #include "solver.hpp"
-#include <fstream>
 
-//#define N 6
-//#define M 4
-
-//  mpiCC -o out main.cpp && mpiexec -np 8 /home/mirror/university/diploma/SimplexSolver/out
-// mpiCC -o out main.cpp && mpiexec -np 4 /home/mirror/university/diploma/SimplexSolver/out 1000 100
 int main(int argc, char *argv[]) {
-
+    srand(time(nullptr));
     int N = std::stoi(argv[1]);
     int M = std::stoi(argv[2]);
-    std::cout << N << ' ' << M;
     std::string filename;
     bool basis = false;
     switch ( argc ){
         case 4:
             filename = argv[3];
-            std::cout << filename << ' ' << M;
             break;
         case 5:
             filename = argv[3];
-            std::cout << filename << ' ' << "kerek";
             basis = true;
         case 3:
+            basis = true;
             break;
         default:
             N = 6;
@@ -47,94 +39,38 @@ int main(int argc, char *argv[]) {
 
     solver::init_solver(&argc, &argv, &numprocs, &myid, &namelen, processor_name);
 
-     //   int M = std::stoi(argv[2]);
- //   int N = std::stoi(argv[1]) + M;
-
-    //int const N = 2 + 4*2;
-    //int M = 100;
-    //int N = 1000 + M;
-    // transposed constraint matrix
-/*
-    solver::matrix<float> At(N, M, {1, 1, 1, -1, 0, //x1
-                                    1, -1, 2, 1, 1, //x2
-                                    -1, 0, 0, 0, 0, //s1
-                                    0, 1, 0, 0, 0,  //s2
-                                    0, 0, 1, 0, 0,  //s3
-                                    0, 0, 0, 1, 0,  //s4
-                                    0, 0, 0, 0, 1,  //s5
-                                    1, 0, 0, 0, 0});//t1
-
-    std::vector<float> Cm = {-1, -1, 1, 0, 0, 0, 0, 0}; // z row
-    std::vector<float> C;
-    //std::vector<float> C = {-5, -4, 0, 0, 0, 0, 0, 0, 0, 0};
-    std::vector<float> B = {2, 1, 6, 1, 2};    // F {24, 6, 1, 2}
-
-*/
-/*
-    solver::matrix<float> At(N, M, {6, 1, -1, 0,
-                                    4, 2, 1, 1,
-                                    1, 0, 0, 0,
-                                    0, 1, 0, 0,
-                                    0, 0, 1, 0,
-                                    0, 0, 0, 1,});
-
-    std::vector<float> C = {-5, -4, 0, 0, 0, 0};
-    std::vector<float> B = {24, 6, 1, 2};
-*/
-/*
-    solver::matrix<float> At(N, M, {1, 1, 1, -1, 0, 0,
-                                    1, -1, 2, 1, 1, 1,
-                                    -1, 0, 0, 0, 0, 0,
-                                    0, 1, 0, 0, 0, 0,
-                                    0, 0, 1, 0, 0, 0,
-                                    0, 0, 0, 1, 0, 0,
-                                    0, 0, 0, 0, 1, 0,
-                                    0, 0, 0, 0, 0, -1});
-
-    std::vector<float> B = {2, 1, 6, 1, 2, 0.5};
-    //std::vector<float> C = {-5, -4, 0, 0, 0, 0}; // z row
-    std::vector<float> C;
-    //std::vector<float> B = {24, 6, 1, 2};    // F {24, 6, 1, 2}
-    std::vector<float> Cm(N);
-*/
-
-    //solver::matrix<float> At2(N,M);
-    //std::vector<float> C2(N);
-    //std::vector<float> B2(M);
     solver::matrix<float> At2;
     std::vector<float> C2(N);
     std::vector<float> B2(M);
 
-    //bool basis = true;
-    //std::string filename = "/home/mirror/university/diploma/SimplexSolver/user_data_basis.csv";
-    if(myid == 0){
-        At2 = solver::matrix<float>(N, M);
-        std::tie(At2, B2, C2) = solver::read_csv(filename, 6, 4, basis);
-    }
-    solver::find_BFS(numprocs, myid, At2, B2);
-    return 0;
-    /*
-    if(myid == 0)
-        std::tie(At2, B2, C2) = solver::random_problem<float>(N,M);
-    */
-    float optimum = 0;
-    //solver::find_BFS(numprocs, myid, At2, B2);
-    const clock_t begin_time = clock();
+    if(myid == 0) {
+        if(argc == 3){
+            std::tie(At2, B2, C2) = solver::random_problem<float>(N,M);
+        }
 
-    solver::solve(numprocs, myid, At2, C2, B2, optimum, output);
-
-    /*
-    if(myid == 0){
-        std::cout << "time: " << float( clock () - begin_time ) /  CLOCKS_PER_SEC;
-        std::cout << "parameters: " << N << '/' << M << " with pocs number: " << numprocs << std::endl;
-        std::cout << N << ' ' << M << std::endl;
+        else{
+            At2 = solver::matrix<float>(N, M);
+            std::tie(At2, B2, C2) = solver::read_csv(filename, 6, 4, basis);
+        }
     }
-*/
-    if(myid == 0){
-        std::cout.precision(3);
-        std::cout << N << ';' << M << ';' << numprocs << ';' << float( clock () - begin_time ) /  CLOCKS_PER_SEC;
-    }
-    MPI_Finalize();
 
-    return 0; //todo
+    if(!basis){
+        solver::find_BFS(numprocs, myid, At2, B2);
+        MPI_Finalize();
+        return 0;
+    }
+    else{
+        float optimum = 0;
+        const clock_t begin_time = 0;
+        bool is_rand;
+        is_rand = (argc == 3);
+        solver::solve(numprocs, myid, At2, C2, B2, optimum, output, is_rand);
+        if(myid==0 && is_rand){
+            std::cout.precision(3);
+            std::cout << "time: " << float( clock () - begin_time ) /  CLOCKS_PER_SEC << " sec";
+        }
+
+        MPI_Finalize();
+        return 0;
+    }
 }

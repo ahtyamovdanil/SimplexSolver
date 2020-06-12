@@ -1,11 +1,10 @@
 #!/bin/bash
 
-#f
 r=0
 N=0
 M=0
 b=0
-echo $p
+echo "$p"
 while [ -n "$1" ]
 do
 case "$1" in
@@ -44,18 +43,18 @@ if [ $f ]
 then 
   if [ $b -eq 1 ]
     then
-  	echo $f $N $M $b
-  	 mpiexec -np 8 /home/mirror/university/diploma/SimplexSolver/out $f $N $M $b
+  	echo "$f" "$N" "$M" "$b"
+  	 mpiexec -np 4 ./solver "$N" "$M" "$f" "$b" > result.out
   	exit 0;
     else
-        mpiexec -np 8 /home/mirror/university/diploma/SimplexSolver/out $f $N $M
+        mpiexec -np 4 ./solver "$N" "$M" "$f" > result.out
         exit 0;
   fi
 else
   if [ $r -eq 1 ]
   then 
-    echo $r random $N $M
-    mpiexec -np 8 /home/mirror/university/diploma/SimplexSolver/out $N $M
+    echo $r random "$N" "$M"
+    mpiexec -np 4 ./solver "$N" "$M" > result.out
   fi
 fi
 

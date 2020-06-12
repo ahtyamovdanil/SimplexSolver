@@ -35,6 +35,10 @@ namespace solver {
 
         int rows(){return rows_;}
         int columns(){return columns_;}
+
+        void set_rows(int rows){ rows_ = rows; }
+        void set_columns(int columns){ columns_ = columns;}
+
         T* data(){ return data_.data();}
 
         void resize(int rows){
@@ -64,20 +68,6 @@ namespace solver {
         //~matrix(){ std::cout<<"destructor\n"; data_.~vector(); }
     };
 
-
-
-    template<typename T>
-    void print_matrix(std::string mess, T &a) {
-        std::cout << mess << std::endl;
-        for (int i=0; i<a.size(); ++i) {
-            for (int j=0; j<a.at(i).size(); ++j) {
-                std::cout << a[i][j] << " ";
-            }
-            std::cout << std::endl;
-        }
-    };
-
-
     // initialization of MPI system
     inline void init_solver(int *argc, char **argv[], int *numprocs, int *myid, int *namelen, char *processor_name) {
         MPI_Init(argc, argv);
@@ -89,7 +79,6 @@ namespace solver {
         MPI_Get_processor_name(processor_name, namelen);
     }
 
-
     template<typename T>
     int find_piv_row(T &B, T &piv_col) {
         if (B.size() != piv_col.size()){}
@@ -100,7 +89,6 @@ namespace solver {
             if (piv_col[i] != 0) {
                 val = B[i] / piv_col[i];
                 if (val > 0 && (val < result || result == -1)) {
-                    //std::cout << "res: " << val << std::endl;
                     result = val;
                     idx = i;
                 }
@@ -129,7 +117,6 @@ namespace solver {
         std::vector<float> C;
         infile.open(filename, std::ios::in);
 
-                //std::vector<std::string> kek = solver::getNextLineAndSplitIntoTokens(infile);
         if(infile.is_open()){
             std::string line;
             std::getline(infile, line);
@@ -152,16 +139,14 @@ namespace solver {
 
     template<typename T>
     inline std::tuple<matrix<T>, std::vector<T>, std::vector<T>> random_problem(int N, int M) {
-        //srand(time(NULL));
         matrix<T> At(N, M);
+        At.set_rows(N);
         std::vector<T> B(M);
         std::vector<T> C(N);
-        //std::vector<T> expected(N);
         T min = -1;
         T max = 1;
         for(int i=0; i<N; ++i){
             for(int j=0; j<M; ++j){
-                //At.at(i,j) = min + (((float) rand()) / (float) RAND_MAX) * (max - min);
                 if(i >= N-M){
                     if(i-N+M == j)
                         At.at(i,j) = 1;
@@ -176,7 +161,6 @@ namespace solver {
         for(int i=0; i<N; ++i){
             if(i<N-M)
                 C[i] = -1*(rand() % 10 + 1);
-                //C[i] = min + (((float) rand()) / (float) RAND_MAX) * (max - min);
             else
                 C[i] = 0;
         }
@@ -184,36 +168,6 @@ namespace solver {
         for(int i=0; i<M; ++i)
             B[i] = rand() % 10 + 1;
 
-/*
-        T eta = 0.1;
-        for(int i=0; i<M; ++i){
-            T bi = 0;
-            for(int j=0; j<N; ++j){
-                bi += At.at(j,i)*expected[j];
-            }
-            B[i] = bi + eta;
-        }
-        for(int i=0; i<N; ++i)
-            std::cout << expected[i] << ' ';
-        std::cout<<std::endl<<std::endl;
-        */
-/*
-        for(int i=0; i<M; ++i){
-            for(int j=0; j<N; ++j){
-                std::cout << At.at(j, i) << ' ';
-            }
-            std::cout << std::endl;
-        }
-        for(int j=0; j<M; ++j){
-            std::cout << B.at(j) << ' ';
-        }
-        std::cout << std::endl;
-
-        for(int j=0; j<N; ++j){
-            std::cout << C.at(j) << ' ';
-        }
-        std::cout << std::endl;
-*/
         return std::make_tuple(std::move(At),std::move(B),std::move(C));
     }
 
@@ -223,11 +177,11 @@ namespace solver {
                       std::vector<float>& C ,
                       std::vector<float>& B,
                       float& optimum,
-                      bool output){
+                      bool output,
+                      bool is_rand){
 
         int N;
         int M;
-
         if(myid == 0){
             N = At.rows();
             M = At.columns();
@@ -324,9 +278,6 @@ namespace solver {
         int it = 1;
 
         while(!is_done){
-            // find pivot column value and index in each processor
-            //for(auto& item: local_c)
-            //    std::cout << item << ' ';
 
             loc_piv_iter = std::min_element(local_c.begin(), local_c.end());
             loc_piv_i = std::distance(local_c.begin(), loc_piv_iter);
@@ -339,9 +290,6 @@ namespace solver {
 
             // get value of global pivot column and its processor id
             if (myid == 0) {
-                // output for debuging
-                //std::cout << "\n+-------------------------------+" << std::endl;
-                //std::cout << "|  current optimum: " << optimum << "\t\t|" << std::endl;
                 if(output) {
                     std::cout << "|  current optimum: " << optimum << "\t\t|" << std::endl;
 
@@ -443,7 +391,6 @@ namespace solver {
 
             for(int i=0; i<B.size(); ++i)
                 std::cout << B[i] << ' ';
-            //std::cout << "\nC:" << std::endl;
             if(is_done)
                 std::cout << "\noptimum value: " << optimum << std::endl;
             else
@@ -454,7 +401,8 @@ namespace solver {
             }
             std::cout << "\ndone" << std::endl;
         }
-        if(myid == 0){
+
+        if(myid == 0 && !is_rand){
             for(int i = 0; i<N-M; ++i){
                 if((std::find(bind.begin(), bind.end(), i)) == bind.end())
                     std::cout << 0 << ';';
@@ -463,9 +411,9 @@ namespace solver {
                         if(bind[j] == i){
                             std::cout << B[j] << ';';
                             B.erase(B.begin()+i);
+                            bind.erase(bind.begin()+i);
                         }
                     }
-
             }
         }
     }
@@ -496,30 +444,8 @@ namespace solver {
             }
         }
 
-        solve(numprocs, myid, At, C, B, optimum, false);
+        solve(numprocs, myid, At, C, B, optimum, false, false);
     }
 
-
-    std::vector<std::string> getNextLineAndSplitIntoTokens(std::istream& str)
-    {
-        std::vector<std::string>   result;
-        std::string                line;
-        std::getline(str,line);
-
-        std::stringstream lineStream(line);
-        std::string cell;
-
-        while(std::getline(lineStream,cell, ','))
-        {
-            result.push_back(cell);
-        }
-        // This checks for a trailing comma with no data after it.
-        if (!lineStream && cell.empty())
-        {
-            // If there was a trailing comma then add an empty element.
-            result.push_back("");
-        }
-        return result;
-    }
 }
 #endif //SIMPLEXSOLVER_SOLVER_HPP
