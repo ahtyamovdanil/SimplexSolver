@@ -45,6 +45,7 @@ int main(int argc, char *argv[]) {
 
     if(myid == 0) {
         if(argc == 3){
+            At2 = solver::matrix<float>(N, M);
             std::tie(At2, B2, C2) = solver::random_problem<float>(N,M);
         }
 
@@ -67,7 +68,7 @@ int main(int argc, char *argv[]) {
         solver::solve(numprocs, myid, At2, C2, B2, optimum, output, is_rand);
         if(myid==0 && is_rand){
             std::cout.precision(3);
-            std::cout << "time: " << float( clock () - begin_time ) /  CLOCKS_PER_SEC << " sec";
+            std::cout << "time: " << float( clock () - begin_time ) /  CLOCKS_PER_SEC << " sec" << std::endl;
         }
 
         MPI_Finalize();

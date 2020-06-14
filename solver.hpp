@@ -15,20 +15,35 @@
 #include <ctime>
 #include <sstream>
 #include <fstream>
-
+#include <cassert>
+#include <numeric>
+//mpiCC -o out main.cpp && mpiexec -np 8 /home/mirror/university/diploma/SimplexSolver/out
 namespace solver {
 
     template <class T>
     class matrix {
         std::vector<T> data_;
-        int rows_;
-        int columns_;
+        int rows_{};
+        int columns_{};
     public:
         matrix(int rows, int columns) :rows_(0), columns_(columns) {
-            data_.reserve(rows*columns);
+            data_.reserve((rows+1)*columns);
         }
         matrix(int rows, int columns, std::vector<T> data) : rows_(rows), columns_(columns), data_(data) {}
         matrix() : rows_(0), columns_(0) {}
+
+        matrix(matrix<T>&& x) noexcept {
+            rows_ = x.rows_;
+            columns_ = x.columns_;
+            data_ = std::move(x.data_);
+        }
+
+        matrix<T>& operator= (matrix<T>&& x) noexcept {
+            rows_ = x.rows_;
+            columns_ = x.columns_;
+            data_ = std::move(x.data_);
+            return *this;
+        }
 
         T &operator()(int row, int column) { return data_[row*columns_+column]; }
         T &operator()(int index) { return data_[index]; }
@@ -61,9 +76,10 @@ namespace solver {
         void add_row(std::vector<float> row){
             if(row.size() != columns_)
                 throw std::length_error("row length not equal to the number of matrix columns");
-            data_.insert(data_.end(), row.begin(), row.end());
+            data_.insert(data_.begin() + rows_*columns_, row.begin(), row.end());
             ++ rows_;
         }
+
 
         //~matrix(){ std::cout<<"destructor\n"; data_.~vector(); }
     };
@@ -196,7 +212,7 @@ namespace solver {
         std::vector<int> bind(M);
         for(int i=0; i<bind.size(); ++i){
             bind[i] = i+N-M-1;
-        };
+        }
 
         //char processor_name[MPI_MAX_PROCESSOR_NAME];
         //init_solver(argc, argv, &numprocs, &myid, &namelen, processor_name);
